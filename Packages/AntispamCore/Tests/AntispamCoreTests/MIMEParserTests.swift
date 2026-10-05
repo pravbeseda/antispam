@@ -180,6 +180,48 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText == "Hello\n--b\nContent-Type: text/plain\nBuy pills now")
     }
 
+    @Test func delimiterMayHaveTrailingPaddingOnly() {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b \t",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://first.example",
+            "--bb",
+            "--b--x",
+            "--b\t",
+            "Content-Type: text/plain",
+            "",
+            "https://second.example",
+            "--b--\t ",
+            "Content-Type: text/plain",
+            "",
+            "https://epilogue.example",
+        ])
+        #expect(message.bodyText == "https://first.example\n--bb\n--b--x")
+        #expect(message.linkDomains == ["first.example", "second.example"])
+    }
+
+    @Test func missingCloseDelimiterKeepsTheLastPart() {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "Unterminated",
+            "",
+        ])
+        #expect(message.bodyText == "Unterminated")
+    }
+
+    @Test func textPartIsTruncated() {
+        let message = parse(["Content-Type: text/plain", "", String(repeating: "x", count: MIMEParser.maxTextLength + 1)])
+        #expect(message.bodyText.count == MIMEParser.maxTextLength)
+    }
+
     @Test(arguments: [
         "Content-Type: text/plain; name=secret.txt",
         "Content-Disposition: inline; filename=secret.txt",

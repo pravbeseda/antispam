@@ -36,12 +36,11 @@ enum TextNormalizer {
 }
 
 enum LinkDomains {
-    static func extract(from texts: [String]) -> [String] {
+    static func extract(from text: String) -> [String] {
         var seen: Set<String> = []
-        return texts.flatMap { text in
-            // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
-            text.matches(of: /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/).map { $0.output.1.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
-        }
-        .filter { !$0.isEmpty && seen.insert($0).inserted }
+        // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
+        return text.matches(of: /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/)
+            .map { $0.output.1.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 }

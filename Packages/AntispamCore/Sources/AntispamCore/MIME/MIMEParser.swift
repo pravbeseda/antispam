@@ -12,6 +12,9 @@ public struct ParsedMessage: Sendable {
 
 public enum MIMEParser {
     static let maxNestingDepth = 16
+    /// Text cleanup is regex-based and slow on huge parts; Jev reads far less, and filler that pushes
+    /// the real text past this limit is costly and conspicuous.
+    static let maxTextLength = 512 * 1024
 
     public static func parse(_ data: Data) -> ParsedMessage {
         // ISO Latin-1 maps every byte to one character, so the structure can be parsed as text
@@ -29,7 +32,8 @@ public enum MIMEParser {
         return ParsedMessage(
             headers: root.headers.map { ($0.name, EncodedWords.decode(Charset.decodeHeader($0.value))) },
             bodyText: TextNormalizer.normalize(body),
-            linkDomains: LinkDomains.extract(from: plain + html)
+            // One pass over all parts: each regex run has a fixed cost that adds up over thousands of tiny parts.
+            linkDomains: LinkDomains.extract(from: (plain + html).joined(separator: "\n"))
         )
     }
 
@@ -40,9 +44,10 @@ public enum MIMEParser {
             parts.forEach { collectText(from: $0, depth: depth + 1, plain: &plain, html: &html) }
             return
         }
+        let text = { String(entity.decodedText.prefix(maxTextLength)) }
         switch entity.contentType.mediaType {
-        case "text/plain": plain.append(entity.decodedText)
-        case "text/html": html.append(entity.decodedText)
+        case "text/plain": plain.append(text())
+        case "text/html": html.append(text())
         default: break
         }
     }
