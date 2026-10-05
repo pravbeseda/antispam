@@ -32,20 +32,15 @@ struct SettingsView: View {
         }
         .padding()
         .onAppear {
-            apiKey = settings.apiKey() ?? ""
+            apiKey = settings.apiKey ?? ""
             threshold = settings.threshold
         }
     }
 
     private func save() {
-        do {
-            try settings.setAPIKey(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))
-            settings.threshold = threshold
-            status = "Saved."
-        } catch {
-            status = "Could not save the key: \(error)"
-            Self.logger.error("\(status, privacy: .public)")
-        }
+        settings.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.threshold = threshold
+        status = "Saved."
     }
 
     private func testConnection() async {

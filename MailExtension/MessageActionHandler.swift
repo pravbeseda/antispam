@@ -16,7 +16,7 @@ final class MessageActionHandler: NSObject, MEMessageActionHandler, Sendable {
     }
 
     private func outcome(for data: Data) async -> DecisionRecord.Outcome {
-        guard let settings = SharedSettings(), let apiKey = settings.apiKey() else {
+        guard let settings = SharedSettings(), let apiKey = settings.apiKey, !apiKey.isEmpty else {
             return .failed(reason: "No API key in shared settings")
         }
         do {

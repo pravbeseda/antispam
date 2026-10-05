@@ -1,14 +1,14 @@
 import AntispamCore
 import Foundation
-import Security
 
 /// Settings shared by the app and the Mail extension through their App Group.
 struct SharedSettings {
     private static let thresholdKey = "threshold"
-    private static let apiKeyAccount = "jev-api-key"
+    // Not in the keychain: Mail fetches while the screen is locked, when keychain items are unavailable,
+    // and keychain sharing needs a provisioning profile that expires every 7 days under a Personal Team.
+    private static let apiKeyKey = "jevAPIKey"
 
     let decisionLogURL: URL
-    private let groupID: String
     private let defaults: UserDefaults
 
     init?(bundle: Bundle = .main) {
@@ -17,7 +17,6 @@ struct SharedSettings {
               let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
         else { return nil }
         decisionLogURL = container.appending(path: "decisions.json")
-        self.groupID = groupID
         self.defaults = defaults
     }
 
@@ -26,34 +25,8 @@ struct SharedSettings {
         nonmutating set { defaults.set(newValue, forKey: Self.thresholdKey) }
     }
 
-    func apiKey() -> String? {
-        var query = keychainQuery
-        query[kSecReturnData] = true
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+    var apiKey: String? {
+        get { defaults.string(forKey: Self.apiKeyKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.apiKeyKey) }
     }
-
-    func setAPIKey(_ key: String) throws {
-        SecItemDelete(keychainQuery as CFDictionary)
-        var item = keychainQuery
-        item[kSecValueData] = Data(key.utf8)
-        let status = SecItemAdd(item as CFDictionary, nil)
-        guard status == errSecSuccess else { throw KeychainError(status: status) }
-    }
-
-    // The keychain access group has the same ID as the App Group (see `keychain-access-groups` in project.yml).
-    private var keychainQuery: [CFString: Any] {
-        [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: groupID,
-            kSecAttrAccount: Self.apiKeyAccount,
-            kSecAttrAccessGroup: groupID,
-            kSecUseDataProtectionKeychain: true,
-        ]
-    }
-}
-
-struct KeychainError: Error {
-    let status: OSStatus
 }

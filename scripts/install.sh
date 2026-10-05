@@ -18,6 +18,8 @@ done
 
 pkill -x Antispam || true
 pkill -f AntispamMailExtension.appex || true
+# Opening the app while the old instance is still quitting fails with LaunchServices error -600.
+while pgrep -x Antispam >/dev/null; do sleep 0.2; done
 rm -rf "$installed"
 ditto .build/xcode/Build/Products/Release/Antispam.app "$installed"
 "$lsregister" -f "$installed"

@@ -40,7 +40,6 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups: [$(APP_GROUP_ID)]
-        keychain-access-groups: [$(APP_GROUP_ID)]
     dependencies:
       - target: AntispamMailExtension
       - package: AntispamCore
@@ -69,6 +68,5 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups: [$(APP_GROUP_ID)]
-        keychain-access-groups: [$(APP_GROUP_ID)]
     dependencies:
       - package: AntispamCore

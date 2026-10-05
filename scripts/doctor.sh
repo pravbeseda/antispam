@@ -16,8 +16,6 @@ while (( $# )); do
 done
 
 extension_id=com.kalugaman.antispam.mail-extension
-profile=/Applications/Antispam.app/Contents/PlugIns/AntispamMailExtension.appex/Contents/embedded.provisionprofile
-state_dir=~/Library/Caches/com.kalugaman.antispam.watchdog
 problems=()
 
 report() {
@@ -52,21 +50,8 @@ if [[ $latest_action == *"Left untouched: "* ]]; then
   report "Jev check failed: ${failure%% |*}"
 fi
 
-# 4. The provisioning profile expires; warn once a day starting two days ahead.
-if [[ -f $profile ]]; then
-  expires=$(security cms -D -i "$profile" 2>/dev/null | plutil -extract ExpirationDate raw -o - -)
-  expires_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$expires" +%s)
-  if (( expires_epoch - $(date +%s) < 2 * 86400 )); then
-    mkdir -p $state_dir
-    today=$(date +%F)
-    if [[ ! $notify == true || $(cat $state_dir/profile-warning 2>/dev/null) != $today ]]; then
-      report "The signing profile expires $(date -j -r $expires_epoch '+%d %b %H:%M'). Run scripts/install.sh."
-      $notify && print $today > $state_dir/profile-warning
-    fi
-  fi
-else
-  report "Antispam is not installed in /Applications. Run scripts/install.sh."
-fi
+# 4. The app is installed.
+[[ -d /Applications/Antispam.app ]] || report "Antispam is not installed in /Applications. Run scripts/install.sh."
 
 (( ${#problems} == 0 )) && print "OK: no problems in the last $since."
 (( ${#problems} == 0 ))

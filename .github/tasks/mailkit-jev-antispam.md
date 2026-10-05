@@ -31,7 +31,7 @@ Packages/AntispamCore/      # pure logic, tested with `swift test`
 
 1. **Scaffold** — `git init`, `.gitignore`, `brew install xcodegen`, `project.yml` with both targets; `DEVELOPMENT_TEAM` goes into git-ignored `Config/Local.xcconfig`.
    Verify: `xcodegen generate && xcodebuild build` succeeds; the extension shows up in Mail → Settings → Extensions.
-2. **Spike: shared storage under Personal Team** — team-prefixed App Group for settings; the API key lives in a keychain access group with the same ID (`Shared/SharedSettings.swift`). The `keychain-access-groups` entitlement is required: it makes Xcode embed a provisioning profile, without which the data-protection keychain returns `-34018`. Personal Team profiles expire after 7 days, so rebuild weekly.
+2. **Spike: shared storage under Personal Team** — team-prefixed App Group for settings and the API key (`Shared/SharedSettings.swift`). The key was first kept in a shared keychain group, which needs the `keychain-access-groups` entitlement and therefore an embedded provisioning profile (otherwise `-34018`); Personal Team profiles expire after 7 days, and the item was unreadable while the screen was locked, when Mail still fetches mail. The App Group needs no profile, so builds are only bound by the development certificate (expires 2027-10-05).
    Verify: value written by the app is read by the extension (os_log). If Personal Team blocks it, stop and choose a fallback.
 3. **MIME parser (TDD)** — header unfolding, RFC 2047 encoded words, multipart walk, base64 / quoted-printable, charsets `utf-8`, `windows-1251`, `koi8-r`, HTML → text, link domains. Inline message fixtures.
    Verify: `swift test` green.
@@ -41,7 +41,7 @@ Packages/AntispamCore/      # pure logic, tested with `swift test`
    Verify: `swift test` green.
 6. **MailKit handler** — `decideAction(for:)`: `rawData == nil` → `.invokeAgainWithBody`; otherwise parse → Jev → policy → `MEMessageActionDecision`; log category and confidence.
    Verify: build succeeds; handler logs a decision for a test message.
-7. **Host app UI** — API key field (Keychain), threshold slider (default 0.9), "Test connection" button.
+7. **Host app UI** — API key field (App Group), threshold slider (default 0.9), "Test connection" button.
    Verify: key saved and connection test passes against the real API.
 7a. **Decision log** — every decision goes to the system log at `notice` level with sender and subject, and to `decisions.json` in the App Group (newest 200); the app shows them in a table refreshed every 5 s.
    Verify: `swift test` green; a received message appears in the table and in `log show --predicate 'subsystem == "com.kalugaman.antispam"'`.
@@ -51,12 +51,13 @@ Packages/AntispamCore/      # pure logic, tested with `swift test`
 9. **Install** — `scripts/install.sh` builds Release, unregisters development builds (two registered copies make Mail fail with PlugInKit error 16), installs `/Applications/Antispam.app`. App icon source: `Design/AppIcon.svg`, rendered by `scripts/render-icon.swift`.
    Verify: `pluginkit -m -v -i com.kalugaman.antispam.mail-extension` lists only the `/Applications` copy; after restarting Mail a new message appears in the decisions table.
 
-10. **Watchdog** — `scripts/doctor.sh` reports: Mail cannot reach the extension, extension crash reports, a failed latest decision (Jev error, missing key), signing profile expiring within 2 days. Failures superseded by a later successful decision are ignored. `install.sh` installs a LaunchAgent that runs it with `--notify` at load and every 30 minutes (output in `~/Library/Logs/Antispam/watchdog.log`).
+10. **Watchdog** — `scripts/doctor.sh` reports: Mail cannot reach the extension, extension crash reports, a failed latest decision (Jev error, missing key), the app missing from `/Applications`. Failures superseded by a later successful decision are ignored. `install.sh` installs a LaunchAgent that runs it with `--notify` at load and every 30 minutes (output in `~/Library/Logs/Antispam/watchdog.log`).
    Verify: `scripts/doctor.sh --since 3h` finds the 10:24 crash; the agent's first run exits 0.
 
 ## Risks
 
-- Personal Team provisioning profiles expire after 7 days; the extension stops loading until the project is rebuilt.
+- The API key is stored in plain text in the App Group container; revoke it in the TypeSafe console if it leaks.
+- The development certificate expires 2027-10-05; rebuild with `scripts/install.sh` after renewing it.
 - Jev accuracy on Russian is lower than on English (vendor docs); step 8 measures it.
 - Every incoming message leaves the Mac for TypeSafe servers; zero data retention is enterprise-only.
 - `MEMessageActionHandler` runs on newly received messages only, not on existing mail.

@@ -10,11 +10,11 @@ struct DecisionsView: View {
         VStack(alignment: .leading) {
             Text("Recent decisions").font(.headline)
             Table(records) {
-                TableColumn("Time") { Text($0.date, format: .dateTime.day().month().hour().minute()) }
+                TableColumn("Time") { Text($0.date, format: .dateTime.day().month().hour().minute()).foregroundStyle(Self.tint($0.outcome)) }
                     .width(110)
-                TableColumn("From", value: \.from)
-                TableColumn("Subject", value: \.subject)
-                TableColumn("Result") { Text(Self.describe($0.outcome)) }
+                TableColumn("From") { Text($0.from).foregroundStyle(Self.tint($0.outcome)) }
+                TableColumn("Subject") { Text($0.subject).foregroundStyle(Self.tint($0.outcome)) }
+                TableColumn("Result") { Text(Self.describe($0.outcome)).foregroundStyle(Self.tint($0.outcome)) }
             }
         }
         .padding()
@@ -24,6 +24,15 @@ struct DecisionsView: View {
                 records = await log.records()
                 try? await Task.sleep(for: .seconds(5))
             }
+        }
+    }
+
+    private static func tint(_ outcome: DecisionRecord.Outcome) -> Color {
+        switch outcome {
+        case .failed: .red
+        case .classified(_, .moveToJunk): .purple
+        case .classified(_, .highlight): .yellow
+        case .classified(_, .none): .primary
         }
     }
 
