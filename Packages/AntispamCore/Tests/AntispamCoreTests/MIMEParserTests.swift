@@ -234,6 +234,13 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText.hasPrefix("Buy now\nBuy now"))
     }
 
+    @Test func longTokenBeforeTheCutDoesNotLeaveATruncatedHost() {
+        let tail = "<a href=\"https://news.example/t?" + String(repeating: "x", count: 2000) + "\">x</a><br>https://paypal"
+        let html = String(repeating: "a", count: MIMEParser.maxTextBytes - tail.utf8.count) + tail + ".com/login"
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == ["news.example"])
+    }
+
     @Test func earlyWhitespaceDoesNotEmptyAnOversizedPart() {
         let html = "<html lang=en><body>https://evil.example/" + String(repeating: "x", count: MIMEParser.maxTextBytes)
         let message = parse(["Content-Type: text/html", "", html])

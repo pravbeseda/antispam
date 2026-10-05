@@ -15,7 +15,7 @@ public enum MIMEParser {
     /// Shared by all text parts. HTML cleanup is regex-based and slow on huge text; Jev reads far less,
     /// and filler that pushes the real text past this limit is costly and conspicuous.
     static let maxTextBytes = 512 * 1024
-    /// The tail searched for a whitespace to cut at; a link's scheme, user info and host fit well within it.
+    /// How far back a link left open by the cut is dropped; a real link's scheme, user info and host fit well within it.
     private static let linkWindow = 1024
 
     public static func parse(_ data: Data) -> ParsedMessage {
@@ -56,13 +56,20 @@ public enum MIMEParser {
         if type == "text/plain" { plain.append(text) } else { html.append(text) }
     }
 
-    /// Cuts at a whitespace near the limit so a link straddling it is dropped rather than left with a truncated host.
+    /// Cuts at the limit; a link still open there is dropped rather than left with a truncated host.
     private static func truncated(_ text: String, toBytes limit: Int) -> String {
         guard text.utf8.count > limit else { return text }
         var end = text.utf8.index(text.utf8.startIndex, offsetBy: limit)
         while end.samePosition(in: text.unicodeScalars) == nil { end = text.utf8.index(before: end) }
         let head = text.unicodeScalars[..<end]
-        let cut = head.suffix(linkWindow).lastIndex { $0.properties.isWhitespace } ?? end
-        return String(head[..<cut])
+        let window = head.suffix(linkWindow)
+        guard let scheme = window.ranges(of: "://".unicodeScalars).last,
+              !window[scheme.upperBound...].contains(where: endsLinkHost) else { return String(head) }
+        return String(head[..<scheme.lowerBound])
+    }
+
+    /// Characters that end both the user info and the host for `LinkDomains`.
+    private static func endsLinkHost(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.properties.isWhitespace || "/?#\"'<>".unicodeScalars.contains(scalar)
     }
 }
