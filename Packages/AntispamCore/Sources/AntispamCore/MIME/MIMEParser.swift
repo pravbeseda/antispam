@@ -51,8 +51,10 @@ public enum MIMEParser {
         }
         let type = entity.contentType.mediaType
         guard type == "text/plain" || type == "text/html" else { return }
-        let text = truncated(entity.decodedText, toBytes: budget)
-        budget -= text.utf8.count
+        let decoded = entity.decodedText
+        let text = truncated(decoded, toBytes: budget)
+        // A cut spends the budget even if it kept less, so later parts are not decoded for a few leftover bytes.
+        budget = text.utf8.count < decoded.utf8.count ? 0 : budget - text.utf8.count
         if type == "text/plain" { plain.append(text) } else { html.append(text) }
     }
 

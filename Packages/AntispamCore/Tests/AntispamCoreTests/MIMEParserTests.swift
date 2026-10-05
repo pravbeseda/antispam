@@ -253,6 +253,28 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText.utf8.count <= MIMEParser.maxTextBytes)
     }
 
+    @Test func budgetIsSpentOnceAPartIsCut() {
+        let html = "<p>Real body</p>" + String(repeating: "a", count: MIMEParser.maxTextBytes - 17)
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/html",
+            "",
+            html,
+            "--b",
+            "Content-Type: text/plain; charset=utf-8",
+            "",
+            "é",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "z",
+            "--b--",
+        ])
+        #expect(message.bodyText.hasPrefix("Real body"))
+    }
+
     @Test func limitIsSharedByAllParts() {
         let filler = String(repeating: "a ", count: MIMEParser.maxTextBytes / 4)
         let message = parse([
