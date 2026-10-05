@@ -228,6 +228,12 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText.hasSuffix("x x"))
     }
 
+    @Test func partWithoutWhitespaceIsCutAtTheLimit() {
+        let html = String(repeating: "<p>Buy&nbsp;now</p>", count: MIMEParser.maxTextLength / 19 + 1)
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.bodyText.hasPrefix("Buy now\nBuy now"))
+    }
+
     @Test func truncationDoesNotCutALink() {
         // The limit falls right after `https://paypal`.
         let filler = String(repeating: "a", count: MIMEParser.maxTextLength - 34)

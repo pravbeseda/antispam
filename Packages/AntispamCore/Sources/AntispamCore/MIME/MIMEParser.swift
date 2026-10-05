@@ -52,10 +52,11 @@ public enum MIMEParser {
         }
     }
 
-    /// Cuts at a whitespace so a link straddling the limit is dropped rather than left with a truncated host.
+    /// Cuts at a whitespace so a link straddling the limit is dropped rather than left with a truncated host;
+    /// text with no whitespace at all is cut at the limit, so it cannot empty the part.
     private static func truncated(_ text: String) -> String {
         let head = text.prefix(maxTextLength)
         guard head.endIndex < text.endIndex else { return text }
-        return String(head[..<(head.lastIndex(where: \.isWhitespace) ?? head.startIndex)])
+        return String(head[..<(head.lastIndex(where: \.isWhitespace) ?? head.endIndex)])
     }
 }
