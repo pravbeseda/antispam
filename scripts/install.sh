@@ -10,11 +10,11 @@ xcodegen generate --quiet
 xcodebuild -project Antispam.xcodeproj -scheme Antispam -configuration Release \
   -derivedDataPath .build/xcode -allowProvisioningUpdates -quiet build
 
-# Development builds register the same extension ID; two copies make Mail fail with PlugInKit error 16.
-for app in .build/xcode/Build/Products/*/Antispam.app; do
-  pluginkit -r "$app/Contents/PlugIns/AntispamMailExtension.appex" 2>/dev/null || true
-  "$lsregister" -u "$app" 2>/dev/null || true
-done
+# Building registers the product; the Release copy here has the installed extension's ID,
+# and two registered copies make Mail fail with PlugInKit error 16.
+built=.build/xcode/Build/Products/Release/Antispam.app
+pluginkit -r "$built/Contents/PlugIns/AntispamMailExtension.appex" 2>/dev/null || true
+"$lsregister" -u "$built" 2>/dev/null || true
 
 pkill -x Antispam || true
 pkill -f AntispamMailExtension.appex || true
