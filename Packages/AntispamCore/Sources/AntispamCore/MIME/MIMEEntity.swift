@@ -28,8 +28,11 @@ struct MIMEEntity {
         HeaderValue(value(of: "Content-Type") ?? "text/plain")
     }
 
+    /// Explicit `attachment`, or any part carrying a file name, which is how many clients mark attachments.
     var isAttachment: Bool {
-        value(of: "Content-Disposition").map { HeaderValue($0).mediaType == "attachment" } ?? false
+        let disposition = value(of: "Content-Disposition").map(HeaderValue.init)
+        let named = { (value: HeaderValue?, key: String) in value?.parameters.keys.contains { $0.hasPrefix(key) } ?? false }
+        return disposition?.mediaType == "attachment" || named(disposition, "filename") || named(contentType, "name")
     }
 
     var multipartChildren: [MIMEEntity]? {

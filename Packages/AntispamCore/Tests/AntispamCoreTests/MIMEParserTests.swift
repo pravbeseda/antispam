@@ -180,6 +180,39 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText == "Hello\n--b\nContent-Type: text/plain\nBuy pills now")
     }
 
+    @Test(arguments: [
+        "Content-Type: text/plain; name=secret.txt",
+        "Content-Disposition: inline; filename=secret.txt",
+    ])
+    func namedPartIsAnAttachment(header: String) {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/html",
+            "",
+            "<p>Real body</p>",
+            "--b",
+            header,
+            "",
+            "ATTACHMENT CONTENT",
+            "--b--",
+        ])
+        #expect(message.bodyText == "Real body")
+    }
+
+    @Test func nestingBeyondTheLimitIsNotParsed() {
+        func nested(_ depth: Int) -> ParsedMessage {
+            var body = "Content-Type: text/plain\r\n\r\nhello"
+            for level in 0..<depth {
+                body = "Content-Type: multipart/mixed; boundary=b\(level)\r\n\r\n--b\(level)\r\n\(body)\r\n--b\(level)--"
+            }
+            return MIMEParser.parse(Data(body.utf8))
+        }
+        #expect(nested(MIMEParser.maxNestingDepth).bodyText == "hello")
+        #expect(nested(MIMEParser.maxNestingDepth + 1).bodyText == "")
+    }
+
     @Test func linkDomainsAreCollectedFromAllTextParts() {
         let message = parse([
             "Content-Type: multipart/alternative; boundary=b",

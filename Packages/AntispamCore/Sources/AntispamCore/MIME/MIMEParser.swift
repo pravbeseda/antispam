@@ -11,6 +11,8 @@ public struct ParsedMessage: Sendable {
 }
 
 public enum MIMEParser {
+    static let maxNestingDepth = 16
+
     public static func parse(_ data: Data) -> ParsedMessage {
         // ISO Latin-1 maps every byte to one character, so the structure can be parsed as text
         // and each part's bytes recovered losslessly for its own charset.
@@ -19,7 +21,7 @@ public enum MIMEParser {
 
         var plain: [String] = []
         var html: [String] = []
-        collectText(from: root, plain: &plain, html: &html)
+        collectText(from: root, depth: 0, plain: &plain, html: &html)
 
         // Spam often pairs an empty plain part with the real HTML to slip past text-only filters.
         let body = plain.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -31,10 +33,11 @@ public enum MIMEParser {
         )
     }
 
-    private static func collectText(from entity: MIMEEntity, plain: inout [String], html: inout [String]) {
+    private static func collectText(from entity: MIMEEntity, depth: Int, plain: inout [String], html: inout [String]) {
         guard !entity.isAttachment else { return }
-        if let parts = entity.multipartChildren {
-            parts.forEach { collectText(from: $0, plain: &plain, html: &html) }
+        // Parsing cost grows with depth × size, and crafted mail can nest hundreds of levels; real mail stays a few deep.
+        if depth < maxNestingDepth, let parts = entity.multipartChildren {
+            parts.forEach { collectText(from: $0, depth: depth + 1, plain: &plain, html: &html) }
             return
         }
         switch entity.contentType.mediaType {
