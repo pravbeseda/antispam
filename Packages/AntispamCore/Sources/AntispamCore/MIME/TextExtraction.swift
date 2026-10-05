@@ -41,28 +41,27 @@ enum TextNormalizer {
 }
 
 enum LinkDomains {
-    /// How far back `unfinishedLinkStart` looks; a real link's scheme, user info and host fit well within it.
+    /// How far around a cut `unfinishedLinkStart` looks; a real link's scheme, user info and host fit well within it.
     private static let window = 1024
+
+    // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
+    private static var pattern: Regex<(Substring, Substring)> { /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/ }
 
     static func extract(from text: String) -> [String] {
         var seen: Set<String> = []
-        // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
-        return text.matches(of: /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/)
+        return text.matches(of: pattern)
             .map { $0.output.1.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
             .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
-    /// Where a link starts whose user info or host may run past the end of `text`; cutting there keeps a
-    /// truncated host out of `extract`.
-    static func unfinishedLinkStart(in text: Substring.UnicodeScalarView) -> String.Index? {
-        let tail = text.suffix(window)
-        guard let scheme = tail.ranges(of: "://".unicodeScalars).last,
-              !tail[scheme.upperBound...].contains(where: endsHost) else { return nil }
-        return scheme.lowerBound
-    }
-
-    /// The characters that end both the user info and the host in `extract`'s pattern.
-    private static func endsHost(_ scalar: Unicode.Scalar) -> Bool {
-        scalar.properties.isWhitespace || "/?#\"'<>".unicodeScalars.contains(scalar)
+    /// Where to cut `text` instead of at `end` so that the last link before `end` keeps the host it has in the
+    /// whole text; nil when no link is affected.
+    static func unfinishedLinkStart(in text: String, cutAt end: String.Index) -> String.Index? {
+        let scalars = text.unicodeScalars
+        let from = scalars[..<end].suffix(window).startIndex
+        let to = scalars.index(end, offsetBy: window, limitedBy: scalars.endIndex) ?? scalars.endIndex
+        guard let cut = Substring(scalars[from..<end]).matches(of: pattern).last else { return nil }
+        let whole = Substring(scalars[cut.range.lowerBound..<to]).firstMatch(of: pattern)
+        return whole?.output.1 == cut.output.1 ? nil : cut.range.lowerBound
     }
 }

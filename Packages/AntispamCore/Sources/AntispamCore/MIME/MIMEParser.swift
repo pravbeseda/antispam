@@ -61,7 +61,6 @@ public enum MIMEParser {
         guard text.utf8.count > limit else { return text }
         var end = text.utf8.index(text.utf8.startIndex, offsetBy: limit)
         while end.samePosition(in: text.unicodeScalars) == nil { end = text.utf8.index(before: end) }
-        let head = text.unicodeScalars[..<end]
-        return String(head[..<(LinkDomains.unfinishedLinkStart(in: head) ?? end)])
+        return String(text.unicodeScalars[..<(LinkDomains.unfinishedLinkStart(in: text, cutAt: end) ?? end)])
     }
 }

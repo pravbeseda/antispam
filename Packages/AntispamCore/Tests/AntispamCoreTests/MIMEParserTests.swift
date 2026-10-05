@@ -241,6 +241,14 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.linkDomains == ["news.example"])
     }
 
+    @Test(arguments: [("", ["paypal.com"]), ("@evil.example", [])])
+    func linkFinishedBeforeTheCutIsKept(after: String, expected: [String]) {
+        let link = "https://paypal.com," + String(repeating: "x", count: 1000) + after
+        let html = String(repeating: "a", count: MIMEParser.maxTextBytes - 600) + link
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == expected)
+    }
+
     @Test func earlyWhitespaceDoesNotEmptyAnOversizedPart() {
         let html = "<html lang=en><body>https://evil.example/" + String(repeating: "x", count: MIMEParser.maxTextBytes)
         let message = parse(["Content-Type: text/html", "", html])
