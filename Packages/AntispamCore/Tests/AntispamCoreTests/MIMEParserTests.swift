@@ -141,6 +141,45 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText == "Invoice attached")
     }
 
+    @Test func attachedMultipartIsIgnored() {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=outer",
+            "",
+            "--outer",
+            "Content-Type: text/html",
+            "",
+            "<p>Real body</p>",
+            "--outer",
+            "Content-Type: multipart/alternative; boundary=inner",
+            "Content-Disposition: attachment",
+            "",
+            "--inner",
+            "Content-Type: text/plain",
+            "",
+            "ATTACHED TEXT",
+            "--inner--",
+            "--outer--",
+        ])
+        #expect(message.bodyText == "Real body")
+    }
+
+    @Test func indentedBoundaryTextIsNotADelimiter() {
+        let message = parse([
+            "Content-Type: multipart/alternative; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "Hello",
+            " --b",
+            "Content-Type: text/plain",
+            "",
+            "Buy pills now",
+            "--b-- ",
+        ])
+        #expect(message.bodyText == "Hello\n--b\nContent-Type: text/plain\nBuy pills now")
+    }
+
     @Test func linkDomainsAreCollectedFromAllTextParts() {
         let message = parse([
             "Content-Type: multipart/alternative; boundary=b",
@@ -161,6 +200,15 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
     @Test func userInfoDoesNotHideTheLinkHost() {
         let message = parse(["Content-Type: text/plain", "", "Log in: https://paypal.com@evil.example/login"])
         #expect(message.linkDomains == ["evil.example"])
+    }
+
+    @Test func addressInQueryOrFragmentIsNotUserInfo() {
+        let message = parse([
+            "Content-Type: text/plain",
+            "",
+            "https://shop.example.com?e=bob@gmail.com https://t.example?u=bob@mail.example&c=1 https://news.example#bob@other.example",
+        ])
+        #expect(message.linkDomains == ["shop.example.com", "t.example", "news.example"])
     }
 
     @Test func lfLineEndingsAreAccepted() {

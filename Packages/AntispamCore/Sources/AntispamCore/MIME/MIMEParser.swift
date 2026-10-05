@@ -32,11 +32,11 @@ public enum MIMEParser {
     }
 
     private static func collectText(from entity: MIMEEntity, plain: inout [String], html: inout [String]) {
+        guard !entity.isAttachment else { return }
         if let parts = entity.multipartChildren {
             parts.forEach { collectText(from: $0, plain: &plain, html: &html) }
             return
         }
-        guard !entity.isAttachment else { return }
         switch entity.contentType.mediaType {
         case "text/plain": plain.append(entity.decodedText)
         case "text/html": html.append(entity.decodedText)

@@ -39,7 +39,8 @@ struct MIMEEntity {
         var parts: [[Substring]] = []
         var current: [Substring]?
         for line in body.split(separator: "\n", omittingEmptySubsequences: false) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // A delimiter starts the line; only trailing padding is allowed (RFC 2046).
+            let trimmed = line.replacing(/[ \t]+$/, with: "")
             guard trimmed == delimiter || trimmed == delimiter + "--" else {
                 current?.append(line)
                 continue
