@@ -223,20 +223,50 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
     }
 
     @Test func textPartIsTruncated() {
-        let message = parse(["Content-Type: text/plain", "", String(repeating: "x ", count: MIMEParser.maxTextLength)])
-        #expect(message.bodyText.count < MIMEParser.maxTextLength)
+        let message = parse(["Content-Type: text/plain", "", String(repeating: "x ", count: MIMEParser.maxTextBytes)])
+        #expect(message.bodyText.count < MIMEParser.maxTextBytes)
         #expect(message.bodyText.hasSuffix("x x"))
     }
 
     @Test func partWithoutWhitespaceIsCutAtTheLimit() {
-        let html = String(repeating: "<p>Buy&nbsp;now</p>", count: MIMEParser.maxTextLength / 19 + 1)
+        let html = String(repeating: "<p>Buy&nbsp;now</p>", count: MIMEParser.maxTextBytes / 19 + 1)
         let message = parse(["Content-Type: text/html", "", html])
         #expect(message.bodyText.hasPrefix("Buy now\nBuy now"))
     }
 
+    @Test func earlyWhitespaceDoesNotEmptyAnOversizedPart() {
+        let html = "<html lang=en><body>https://evil.example/" + String(repeating: "x", count: MIMEParser.maxTextBytes)
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == ["evil.example"])
+    }
+
+    @Test func limitCountsBytesNotCharacters() {
+        let cluster = "a" + String(repeating: "\u{301}", count: MIMEParser.maxTextBytes)
+        let message = parse(["Content-Type: text/plain; charset=utf-8", "", cluster])
+        #expect(message.bodyText.utf8.count <= MIMEParser.maxTextBytes)
+    }
+
+    @Test func limitIsSharedByAllParts() {
+        let filler = String(repeating: "a ", count: MIMEParser.maxTextBytes / 4)
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://one.example \(filler)",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://two.example \(filler) https://three.example",
+            "--b--",
+        ])
+        #expect(message.linkDomains == ["one.example", "two.example"])
+    }
+
     @Test func truncationDoesNotCutALink() {
         // The limit falls right after `https://paypal`.
-        let filler = String(repeating: "a", count: MIMEParser.maxTextLength - 34)
+        let filler = String(repeating: "a", count: MIMEParser.maxTextBytes - 34)
         let message = parse(["Content-Type: text/html", "", "https://ok.example \(filler) https://paypal.com/login"])
         #expect(message.linkDomains == ["ok.example"])
     }

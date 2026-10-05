@@ -12,9 +12,11 @@ public struct ParsedMessage: Sendable {
 
 public enum MIMEParser {
     static let maxNestingDepth = 16
-    /// HTML cleanup is regex-based and slow on huge parts; Jev reads far less, and filler that pushes
-    /// the real text past this limit is costly and conspicuous.
-    static let maxTextLength = 512 * 1024
+    /// Shared by all text parts. HTML cleanup is regex-based and slow on huge text; Jev reads far less,
+    /// and filler that pushes the real text past this limit is costly and conspicuous.
+    static let maxTextBytes = 512 * 1024
+    /// The tail searched for a whitespace to cut at; a link's scheme, user info and host fit well within it.
+    private static let linkWindow = 1024
 
     public static func parse(_ data: Data) -> ParsedMessage {
         // ISO Latin-1 maps every byte to one character, so the structure can be parsed as text
@@ -24,7 +26,8 @@ public enum MIMEParser {
 
         var plain: [String] = []
         var html: [String] = []
-        collectText(from: root, depth: 0, plain: &plain, html: &html)
+        var budget = maxTextBytes
+        collectText(from: root, depth: 0, budget: &budget, plain: &plain, html: &html)
 
         // Spam often pairs an empty plain part with the real HTML to slip past text-only filters.
         let body = plain.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -37,26 +40,29 @@ public enum MIMEParser {
         )
     }
 
-    private static func collectText(from entity: MIMEEntity, depth: Int, plain: inout [String], html: inout [String]) {
-        guard !entity.isAttachment else { return }
+    private static func collectText(
+        from entity: MIMEEntity, depth: Int, budget: inout Int, plain: inout [String], html: inout [String]
+    ) {
+        guard !entity.isAttachment, budget > 0 else { return }
         // Parsing cost grows with depth × size, and crafted mail can nest hundreds of levels; real mail stays a few deep.
         if depth < maxNestingDepth, let parts = entity.multipartChildren {
-            parts.forEach { collectText(from: $0, depth: depth + 1, plain: &plain, html: &html) }
+            parts.forEach { collectText(from: $0, depth: depth + 1, budget: &budget, plain: &plain, html: &html) }
             return
         }
-        let text = { truncated(entity.decodedText) }
-        switch entity.contentType.mediaType {
-        case "text/plain": plain.append(text())
-        case "text/html": html.append(text())
-        default: break
-        }
+        let type = entity.contentType.mediaType
+        guard type == "text/plain" || type == "text/html" else { return }
+        let text = truncated(entity.decodedText, toBytes: budget)
+        budget -= text.utf8.count
+        if type == "text/plain" { plain.append(text) } else { html.append(text) }
     }
 
-    /// Cuts at a whitespace so a link straddling the limit is dropped rather than left with a truncated host;
-    /// text with no whitespace at all is cut at the limit, so it cannot empty the part.
-    private static func truncated(_ text: String) -> String {
-        let head = text.prefix(maxTextLength)
-        guard head.endIndex < text.endIndex else { return text }
-        return String(head[..<(head.lastIndex(where: \.isWhitespace) ?? head.endIndex)])
+    /// Cuts at a whitespace near the limit so a link straddling it is dropped rather than left with a truncated host.
+    private static func truncated(_ text: String, toBytes limit: Int) -> String {
+        guard text.utf8.count > limit else { return text }
+        var end = text.utf8.index(text.utf8.startIndex, offsetBy: limit)
+        while end.samePosition(in: text.unicodeScalars) == nil { end = text.utf8.index(before: end) }
+        let head = text.unicodeScalars[..<end]
+        let cut = head.suffix(linkWindow).lastIndex { $0.properties.isWhitespace } ?? end
+        return String(head[..<cut])
     }
 }
