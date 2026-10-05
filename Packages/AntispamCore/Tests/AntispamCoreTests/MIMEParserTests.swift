@@ -158,6 +158,11 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.linkDomains == ["shop.example.com", "evil.example.net", "bit.ly"])
     }
 
+    @Test func userInfoDoesNotHideTheLinkHost() {
+        let message = parse(["Content-Type: text/plain", "", "Log in: https://paypal.com@evil.example/login"])
+        #expect(message.linkDomains == ["evil.example"])
+    }
+
     @Test func lfLineEndingsAreAccepted() {
         let message = MIMEParser.parse(Data("Subject: Hi\n\nBody line\n".utf8))
         #expect(message.values(of: "Subject") == ["Hi"])
