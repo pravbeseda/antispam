@@ -13,7 +13,8 @@ enum TransferEncoding {
     }
 
     static func decodeQuotedPrintable(_ text: String, underscoreIsSpace: Bool) -> Data {
-        let bytes = Array(text.data(using: .isoLatin1)!)
+        // Header text is already UTF-8-decoded, so a raw non-ASCII word does not fit Latin-1.
+        let bytes = Array(text.data(using: .isoLatin1) ?? Data(text.utf8))
         var output = Data(capacity: bytes.count)
         var index = 0
         while index < bytes.count {

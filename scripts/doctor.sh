@@ -23,7 +23,8 @@ problems=()
 report() {
   problems+=("$1")
   print -- "PROBLEM: $1"
-  $notify && osascript -e "display notification \"$1\" with title \"Antispam\""
+  # Passed as an argument: error texts contain quotes that would break an AppleScript literal.
+  $notify && osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "Antispam"' -e 'end run' "$1"
 }
 
 latest() {

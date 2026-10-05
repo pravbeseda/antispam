@@ -46,6 +46,11 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.values(of: "From") == ["Bob Smith <bob@example.com>"])
     }
 
+    @Test func rawNonASCIIInsideQEncodedWordIsKept() {
+        let message = parse(["Subject: =?UTF-8?Q?Привет_мир?=", "", ""])
+        #expect(message.values(of: "Subject") == ["Привет мир"])
+    }
+
     @Test func quotedPrintableBody() {
         let message = parse([
             "Content-Type: text/plain; charset=utf-8",
@@ -84,6 +89,23 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
             "--b1--",
         ])
         #expect(message.bodyText == "Plain version")
+    }
+
+    @Test func emptyPlainPartFallsBackToHTML() {
+        let message = parse([
+            "Content-Type: multipart/alternative; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "  ",
+            "--b",
+            "Content-Type: text/html",
+            "",
+            "<p>Buy now https://evil.example/x</p>",
+            "--b--",
+        ])
+        #expect(message.bodyText == "Buy now https://evil.example/x")
     }
 
     @Test func htmlOnlyIsConvertedToText() {

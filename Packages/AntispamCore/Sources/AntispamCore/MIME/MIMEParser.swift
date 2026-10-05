@@ -21,7 +21,9 @@ public enum MIMEParser {
         var html: [String] = []
         collectText(from: root, plain: &plain, html: &html)
 
-        let body = plain.first ?? html.first.map(HTMLText.plainText(fromHTML:)) ?? ""
+        // Spam often pairs an empty plain part with the real HTML to slip past text-only filters.
+        let body = plain.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            ?? html.first.map(HTMLText.plainText(fromHTML:)) ?? ""
         return ParsedMessage(
             headers: root.headers.map { ($0.name, EncodedWords.decode(Charset.decodeHeader($0.value))) },
             bodyText: TextNormalizer.normalize(body),
