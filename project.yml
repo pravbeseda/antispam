@@ -1,0 +1,74 @@
+name: Antispam
+options:
+  bundleIdPrefix: com.kalugaman.antispam
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    APP_GROUP_ID: $(TeamIdentifierPrefix)com.kalugaman.antispam
+packages:
+  AntispamCore:
+    path: Packages/AntispamCore
+targets:
+  Antispam:
+    type: application
+    platform: macOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kalugaman.antispam
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Antispam
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        AppGroupIdentifier: $(APP_GROUP_ID)
+    entitlements:
+      path: App/App.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.application-groups: [$(APP_GROUP_ID)]
+        keychain-access-groups: [$(APP_GROUP_ID)]
+    dependencies:
+      - target: AntispamMailExtension
+      - package: AntispamCore
+  AntispamMailExtension:
+    type: app-extension
+    platform: macOS
+    sources: [MailExtension, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kalugaman.antispam.mail-extension
+    info:
+      path: MailExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Antispam
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        AppGroupIdentifier: $(APP_GROUP_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.email.extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).MailExtension
+          NSExtensionAttributes:
+            MEExtensionCapabilities: [MEMessageActionHandler]
+    entitlements:
+      path: MailExtension/MailExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.application-groups: [$(APP_GROUP_ID)]
+        keychain-access-groups: [$(APP_GROUP_ID)]
+    dependencies:
+      - package: AntispamCore

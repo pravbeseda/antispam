@@ -1,0 +1,71 @@
+#!/bin/zsh
+# Checks that the installed Antispam extension is actually filtering mail.
+# Usage: doctor.sh [--notify] [--since <log interval, e.g. 35m or 6h>]
+# Exit status 1 means at least one problem was found.
+set -uo pipefail
+
+notify=false
+since=35m
+while (( $# )); do
+  case $1 in
+    --notify) notify=true ;;
+    --since) since=$2; shift ;;
+    *) print -u2 "Unknown argument: $1"; exit 2 ;;
+  esac
+  shift
+done
+
+extension_id=com.kalugaman.antispam.mail-extension
+profile=/Applications/Antispam.app/Contents/PlugIns/AntispamMailExtension.appex/Contents/embedded.provisionprofile
+state_dir=~/Library/Caches/com.kalugaman.antispam.watchdog
+problems=()
+
+report() {
+  problems+=("$1")
+  print -- "PROBLEM: $1"
+  $notify && osascript -e "display notification \"$1\" with title \"Antispam\""
+}
+
+latest() {
+  /usr/bin/log show --last "$since" --style compact --predicate "$1" | grep -E '^[0-9]{4}-' | tail -1
+}
+
+# Failures that a later successful decision has already superseded are not reported.
+latest_action=$(latest 'subsystem == "com.kalugaman.antispam" AND category == "actions"')
+
+# 1. Mail could not reach the extension (stale registration, PlugInKit error 16).
+mail_failure=$(latest "process == \"Mail\" AND eventMessage CONTAINS \"Extension not found while attempting to find action: $extension_id\"")
+if [[ -n $mail_failure && ${mail_failure[1,23]} > ${latest_action[1,23]} ]]; then
+  report "Mail cannot reach the extension. Quit and reopen Mail."
+fi
+
+# 2. The extension crashed.
+minutes=${since%[mh]}
+[[ $since == *h ]] && minutes=$(( minutes * 60 ))
+crash=$(find ~/Library/Logs/DiagnosticReports -name 'AntispamMailExtension-*.ips' -mmin -"$minutes" 2>/dev/null | head -1)
+[[ -n $crash ]] && report "The extension crashed: ${crash:t}"
+
+# 3. The latest decision failed (Jev error, missing API key).
+if [[ $latest_action == *"Left untouched: "* ]]; then
+  failure=${latest_action#*Left untouched: }
+  report "Jev check failed: ${failure%% |*}"
+fi
+
+# 4. The provisioning profile expires; warn once a day starting two days ahead.
+if [[ -f $profile ]]; then
+  expires=$(security cms -D -i "$profile" 2>/dev/null | plutil -extract ExpirationDate raw -o - -)
+  expires_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$expires" +%s)
+  if (( expires_epoch - $(date +%s) < 2 * 86400 )); then
+    mkdir -p $state_dir
+    today=$(date +%F)
+    if [[ ! $notify == true || $(cat $state_dir/profile-warning 2>/dev/null) != $today ]]; then
+      report "The signing profile expires $(date -j -r $expires_epoch '+%d %b %H:%M'). Run scripts/install.sh."
+      $notify && print $today > $state_dir/profile-warning
+    fi
+  fi
+else
+  report "Antispam is not installed in /Applications. Run scripts/install.sh."
+fi
+
+(( ${#problems} == 0 )) && print "OK: no problems in the last $since."
+(( ${#problems} == 0 ))
