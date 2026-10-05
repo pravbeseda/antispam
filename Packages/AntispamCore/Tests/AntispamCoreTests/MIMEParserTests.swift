@@ -217,9 +217,22 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText == "Unterminated")
     }
 
+    @Test func bodyWhitespaceIsNormalized() {
+        let message = parse(["Content-Type: text/plain; charset=utf-8", "", "  a\t b\u{00A0}\u{00A0}c \u{2003}", " \t", "\u{3000}d"])
+        #expect(message.bodyText == "a b c\nd")
+    }
+
     @Test func textPartIsTruncated() {
-        let message = parse(["Content-Type: text/plain", "", String(repeating: "x", count: MIMEParser.maxTextLength + 1)])
-        #expect(message.bodyText.count == MIMEParser.maxTextLength)
+        let message = parse(["Content-Type: text/plain", "", String(repeating: "x ", count: MIMEParser.maxTextLength)])
+        #expect(message.bodyText.count < MIMEParser.maxTextLength)
+        #expect(message.bodyText.hasSuffix("x x"))
+    }
+
+    @Test func truncationDoesNotCutALink() {
+        // The limit falls right after `https://paypal`.
+        let filler = String(repeating: "a", count: MIMEParser.maxTextLength - 34)
+        let message = parse(["Content-Type: text/html", "", "https://ok.example \(filler) https://paypal.com/login"])
+        #expect(message.linkDomains == ["ok.example"])
     }
 
     @Test(arguments: [

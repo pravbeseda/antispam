@@ -12,7 +12,7 @@ public struct ParsedMessage: Sendable {
 
 public enum MIMEParser {
     static let maxNestingDepth = 16
-    /// Text cleanup is regex-based and slow on huge parts; Jev reads far less, and filler that pushes
+    /// HTML cleanup is regex-based and slow on huge parts; Jev reads far less, and filler that pushes
     /// the real text past this limit is costly and conspicuous.
     static let maxTextLength = 512 * 1024
 
@@ -44,11 +44,18 @@ public enum MIMEParser {
             parts.forEach { collectText(from: $0, depth: depth + 1, plain: &plain, html: &html) }
             return
         }
-        let text = { String(entity.decodedText.prefix(maxTextLength)) }
+        let text = { truncated(entity.decodedText) }
         switch entity.contentType.mediaType {
         case "text/plain": plain.append(text())
         case "text/html": html.append(text())
         default: break
         }
+    }
+
+    /// Cuts at a whitespace so a link straddling the limit is dropped rather than left with a truncated host.
+    private static func truncated(_ text: String) -> String {
+        let head = text.prefix(maxTextLength)
+        guard head.endIndex < text.endIndex else { return text }
+        return String(head[..<(head.lastIndex(where: \.isWhitespace) ?? head.startIndex)])
     }
 }

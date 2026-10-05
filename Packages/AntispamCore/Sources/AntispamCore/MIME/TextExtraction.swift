@@ -27,9 +27,14 @@ enum HTMLText {
 
 enum TextNormalizer {
     /// Collapses runs of spaces, trims every line and drops empty lines.
+    /// No per-line regex: its fixed cost per run made a text of many short lines take seconds.
     static func normalize(_ text: String) -> String {
         text.split(separator: "\n")
-            .map { $0.replacing(/[ \t\u{00A0}]+/, with: " ").trimmingCharacters(in: .whitespaces) }
+            .map { line in
+                line.split { $0 == " " || $0 == "\t" || $0 == "\u{00A0}" }
+                    .joined(separator: " ")
+                    .trimmingCharacters(in: .whitespaces)
+            }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
