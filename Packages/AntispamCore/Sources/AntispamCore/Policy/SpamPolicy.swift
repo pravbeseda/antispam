@@ -1,5 +1,5 @@
 public enum SpamAction: String, Codable, Sendable {
-    case moveToJunk, highlight, none
+    case moveToJunk, highlight, flagPromo, none
 }
 
 public struct SpamPolicy: Sendable {
@@ -14,7 +14,8 @@ public struct SpamPolicy: Sendable {
     public func action(for classification: Classification) -> SpamAction {
         switch classification.category {
         case .spam, .phishing: classification.confidence >= threshold ? .moveToJunk : .highlight
-        case .promo, .legit: .none
+        case .promo: classification.confidence >= threshold ? .flagPromo : .none
+        case .legit: .none
         }
     }
 }

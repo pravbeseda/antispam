@@ -45,7 +45,8 @@ final class MessageActionHandler: NSObject, MEMessageActionHandler, Sendable {
         guard case let .classified(_, action) = outcome else { return nil }
         switch action {
         case .moveToJunk: return .action(.moveToJunk)
-        case .highlight: return .action(.setBackgroundColor(.yellow))
+        case .highlight: return .actions([.setBackgroundColor(.yellow), .flag(.gray)])
+        case .flagPromo: return .action(.flag(.purple))
         case .none: return nil
         }
     }
