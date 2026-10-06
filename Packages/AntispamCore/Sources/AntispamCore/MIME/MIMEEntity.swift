@@ -39,24 +39,27 @@ struct MIMEEntity {
         let type = contentType
         guard type.mediaType.hasPrefix("multipart/"), let boundary = type.parameters["boundary"] else { return nil }
         let delimiter = "--" + boundary
-        var parts: [[Substring]] = []
-        var current: [Substring]?
-        for line in body.split(separator: "\n", omittingEmptySubsequences: false) {
-            // A delimiter starts the line; only trailing padding is allowed (RFC 2046).
-            let trimmed = line.replacing(/[ \t]+$/, with: "")
-            guard trimmed == delimiter || trimmed == delimiter + "--" else {
-                current?.append(line)
-                continue
+        var parts: [Substring] = []
+        var partStart: String.Index?
+        var lineStart = body.startIndex
+        while lineStart < body.endIndex {
+            let lineEnd = body.utf8[lineStart...].firstIndex(of: UInt8(ascii: "\n")) ?? body.endIndex
+            let next = lineEnd < body.endIndex ? body.utf8.index(after: lineEnd) : lineEnd
+            if let kind = DelimiterLine(body[lineStart..<lineEnd], delimiter: delimiter) {
+                if let partStart {
+                    // The line break before a delimiter belongs to the delimiter.
+                    parts.append(body[partStart..<max(partStart, body.utf8.index(before: lineStart))])
+                }
+                guard kind == .part else {
+                    partStart = nil
+                    break
+                }
+                partStart = next
             }
-            if let current { parts.append(current) }
-            guard trimmed == delimiter else {
-                current = nil
-                break
-            }
-            current = []
+            lineStart = next
         }
-        if let current { parts.append(current) }
-        return parts.map { MIMEEntity(parsing: $0.joined(separator: "\n")) }
+        if let partStart { parts.append(body[partStart...]) }
+        return parts.map { MIMEEntity(parsing: String($0)) }
     }
 
     var decodedText: String {
@@ -79,6 +82,26 @@ struct MIMEEntity {
                 line[..<colon].trimmingCharacters(in: .whitespaces),
                 line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
             )
+        }
+    }
+}
+
+private enum DelimiterLine {
+    case part, close
+
+    /// A delimiter starts the line; only trailing padding is allowed (RFC 2046).
+    init?(_ line: Substring, delimiter: String) {
+        guard line.utf8.starts(with: delimiter.utf8) else { return nil }
+        var suffix = line.utf8.dropFirst(delimiter.utf8.count)
+        while let last = suffix.last, last == UInt8(ascii: " ") || last == UInt8(ascii: "\t") {
+            suffix = suffix.dropLast()
+        }
+        if suffix.isEmpty {
+            self = .part
+        } else if suffix.elementsEqual("--".utf8) {
+            self = .close
+        } else {
+            return nil
         }
     }
 }

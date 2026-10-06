@@ -180,6 +180,134 @@ private func parse(_ lines: [String], encoding: String.Encoding = .utf8) -> Pars
         #expect(message.bodyText == "Hello\n--b\nContent-Type: text/plain\nBuy pills now")
     }
 
+    @Test func delimiterMayHaveTrailingPaddingOnly() {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b \t",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://first.example",
+            "--bb",
+            "--b--x",
+            "--b\t",
+            "Content-Type: text/plain",
+            "",
+            "https://second.example",
+            "--b--\t ",
+            "Content-Type: text/plain",
+            "",
+            "https://epilogue.example",
+        ])
+        #expect(message.bodyText == "https://first.example\n--bb\n--b--x")
+        #expect(message.linkDomains == ["first.example", "second.example"])
+    }
+
+    @Test func missingCloseDelimiterKeepsTheLastPart() {
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "Unterminated",
+            "",
+        ])
+        #expect(message.bodyText == "Unterminated")
+    }
+
+    @Test func bodyWhitespaceIsNormalized() {
+        let message = parse(["Content-Type: text/plain; charset=utf-8", "", "  a\t b\u{00A0}\u{00A0}c \u{2003}", " \t", "\u{3000}d"])
+        #expect(message.bodyText == "a b c\nd")
+    }
+
+    @Test func textPartIsTruncated() {
+        let message = parse(["Content-Type: text/plain", "", String(repeating: "x ", count: MIMEParser.maxTextBytes)])
+        #expect(message.bodyText.count < MIMEParser.maxTextBytes)
+        #expect(message.bodyText.hasSuffix("x x"))
+    }
+
+    @Test func partWithoutWhitespaceIsCutAtTheLimit() {
+        let html = String(repeating: "<p>Buy&nbsp;now</p>", count: MIMEParser.maxTextBytes / 19 + 1)
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.bodyText.hasPrefix("Buy now\nBuy now"))
+    }
+
+    @Test func longTokenBeforeTheCutDoesNotLeaveATruncatedHost() {
+        let tail = "<a href=\"https://news.example/t?" + String(repeating: "x", count: 2000) + "\">x</a><br>https://paypal"
+        let html = String(repeating: "a", count: MIMEParser.maxTextBytes - tail.utf8.count) + tail + ".com/login"
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == ["news.example"])
+    }
+
+    @Test(arguments: [("", ["paypal.com"]), ("@evil.example", [])])
+    func linkFinishedBeforeTheCutIsKept(after: String, expected: [String]) {
+        let link = "https://paypal.com," + String(repeating: "x", count: 1000) + after
+        let html = String(repeating: "a", count: MIMEParser.maxTextBytes - 600) + link
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == expected)
+    }
+
+    @Test func earlyWhitespaceDoesNotEmptyAnOversizedPart() {
+        let html = "<html lang=en><body>https://evil.example/" + String(repeating: "x", count: MIMEParser.maxTextBytes)
+        let message = parse(["Content-Type: text/html", "", html])
+        #expect(message.linkDomains == ["evil.example"])
+    }
+
+    @Test func limitCountsBytesNotCharacters() {
+        let cluster = "a" + String(repeating: "\u{301}", count: MIMEParser.maxTextBytes)
+        let message = parse(["Content-Type: text/plain; charset=utf-8", "", cluster])
+        #expect(message.bodyText.utf8.count <= MIMEParser.maxTextBytes)
+    }
+
+    @Test func budgetIsSpentOnceAPartIsCut() {
+        let html = "<p>Real body</p>" + String(repeating: "a", count: MIMEParser.maxTextBytes - 17)
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/html",
+            "",
+            html,
+            "--b",
+            "Content-Type: text/plain; charset=utf-8",
+            "",
+            "é",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "z",
+            "--b--",
+        ])
+        #expect(message.bodyText.hasPrefix("Real body"))
+    }
+
+    @Test func limitIsSharedByAllParts() {
+        let filler = String(repeating: "a ", count: MIMEParser.maxTextBytes / 4)
+        let message = parse([
+            "Content-Type: multipart/mixed; boundary=b",
+            "",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://one.example \(filler)",
+            "--b",
+            "Content-Type: text/plain",
+            "",
+            "https://two.example \(filler) https://three.example",
+            "--b--",
+        ])
+        #expect(message.linkDomains == ["one.example", "two.example"])
+    }
+
+    @Test func truncationDoesNotCutALink() {
+        // The limit falls right after `https://paypal`.
+        let filler = String(repeating: "a", count: MIMEParser.maxTextBytes - 34)
+        let message = parse(["Content-Type: text/html", "", "https://ok.example \(filler) https://paypal.com/login"])
+        #expect(message.linkDomains == ["ok.example"])
+    }
+
     @Test(arguments: [
         "Content-Type: text/plain; name=secret.txt",
         "Content-Disposition: inline; filename=secret.txt",

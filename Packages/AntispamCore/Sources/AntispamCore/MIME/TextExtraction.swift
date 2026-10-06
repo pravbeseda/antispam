@@ -27,21 +27,41 @@ enum HTMLText {
 
 enum TextNormalizer {
     /// Collapses runs of spaces, trims every line and drops empty lines.
+    /// No per-line regex: its fixed cost per run made a text of many short lines take seconds.
     static func normalize(_ text: String) -> String {
         text.split(separator: "\n")
-            .map { $0.replacing(/[ \t\u{00A0}]+/, with: " ").trimmingCharacters(in: .whitespaces) }
+            .map { line in
+                line.split { $0 == " " || $0 == "\t" || $0 == "\u{00A0}" }
+                    .joined(separator: " ")
+                    .trimmingCharacters(in: .whitespaces)
+            }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
 }
 
 enum LinkDomains {
-    static func extract(from texts: [String]) -> [String] {
+    /// How far around a cut `unfinishedLinkStart` looks; a real link's scheme, user info and host fit well within it.
+    private static let window = 1024
+
+    // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
+    private static var pattern: Regex<(Substring, Substring)> { /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/ }
+
+    static func extract(from text: String) -> [String] {
         var seen: Set<String> = []
-        return texts.flatMap { text in
-            // Skip `user@` so `https://paypal.com@evil.example` yields the real host.
-            text.matches(of: /(?i)https?:\/\/(?:[^\s\/?#@"'<>]*@)?([a-z0-9.-]+)/).map { $0.output.1.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
-        }
-        .filter { !$0.isEmpty && seen.insert($0).inserted }
+        return text.matches(of: pattern)
+            .map { $0.output.1.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// Where to cut `text` instead of at `end` so that the last link before `end` keeps the host it has in the
+    /// whole text; nil when no link is affected.
+    static func unfinishedLinkStart(in text: String, cutAt end: String.Index) -> String.Index? {
+        let scalars = text.unicodeScalars
+        let from = scalars[..<end].suffix(window).startIndex
+        let to = scalars.index(end, offsetBy: window, limitedBy: scalars.endIndex) ?? scalars.endIndex
+        guard let cut = Substring(scalars[from..<end]).matches(of: pattern).last else { return nil }
+        let whole = Substring(scalars[cut.range.lowerBound..<to]).firstMatch(of: pattern)
+        return whole?.output.1 == cut.output.1 ? nil : cut.range.lowerBound
     }
 }
