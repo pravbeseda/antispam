@@ -7,8 +7,8 @@ Apple Mail extension (macOS) that classifies every incoming message in all Mail 
 | # | Topic | Decision |
 |---|-------|----------|
 | 1 | Signing | Personal use, free Apple ID (Personal Team), Apple Development certificate |
-| 2 | Action | `spam`/`phishing` with confidence ≥ threshold (default 0.9) → Junk; below threshold → yellow background, stays in Inbox |
-| 3 | Categories | One Jev `choice`: `spam` / `phishing` / `promo` / `legit`; `promo` and `legit` → no action |
+| 2 | Action | `spam`/`phishing` with confidence ≥ threshold (default 0.9) → Junk; below threshold → yellow background and gray flag, stays in Inbox; `promo` with confidence ≥ threshold → purple flag |
+| 3 | Categories | One Jev `choice`: `spam` / `phishing` / `promo` / `legit`; `legit` and `promo` below threshold → no action |
 | 4 | Payload | Key headers (`From`, `Reply-To`, `Return-Path`, `To`, `Subject`, `Date`, `List-Unsubscribe`, `Authentication-Results`) + plain-text body truncated to 8000 chars + link domains; no attachments |
 | 5 | Project | XcodeGen `project.yml` (`.xcodeproj` not committed) + local Swift package `AntispamCore` |
 
@@ -37,7 +37,7 @@ Packages/AntispamCore/      # pure logic, tested with `swift test`
    Verify: `swift test` green.
 4. **Jev client (TDD)** — state builder (headers + body ≤ 8000 chars + domains), `choice` question with 4 options, `POST https://api.typesafe.ai/v1/systemone` with Bearer key, parse answer + confidence, non-200 → `JevError.http(status:)`.
    Verify: `swift test` green with an injected transport closure.
-5. **Decision policy (TDD)** — `spam|phishing` & confidence ≥ threshold → `moveToJunk`; `spam|phishing` below threshold → yellow background; otherwise / on error → no action.
+5. **Decision policy (TDD)** — `spam|phishing` & confidence ≥ threshold → `moveToJunk`; `spam|phishing` below threshold → yellow background + gray flag; `promo` & confidence ≥ threshold → purple flag; otherwise / on error → no action.
    Verify: `swift test` green.
 6. **MailKit handler** — `decideAction(for:)`: `rawData == nil` → `.invokeAgainWithBody`; otherwise parse → Jev → policy → `MEMessageActionDecision`; log category and confidence.
    Verify: build succeeds; handler logs a decision for a test message.

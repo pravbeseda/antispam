@@ -32,6 +32,7 @@ struct DecisionsView: View {
         case .failed: .red
         case .classified(_, .moveToJunk): .purple
         case .classified(_, .highlight): .yellow
+        case .classified(_, .flagPromo): .blue
         case .classified(_, .none): .primary
         }
     }

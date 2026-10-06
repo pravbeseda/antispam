@@ -16,7 +16,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             SecureField("Jev API key", text: $apiKey)
                 .textFieldStyle(.roundedBorder)
-            Text("Move to Junk at confidence ≥ \(threshold, format: .number.precision(.fractionLength(2)))")
+            Text("Move to Junk and flag promo at confidence ≥ \(threshold, format: .number.precision(.fractionLength(2)))")
             Slider(value: $threshold, in: 0.5...0.99, step: 0.01)
             HStack {
                 Button("Save", action: save)

@@ -9,7 +9,9 @@ import Testing
         (.phishing, 0.9, .moveToJunk),
         (.spam, 0.5, .highlight),
         (.phishing, 0.89, .highlight),
-        (.promo, 0.99, .none),
+        (.promo, 0.99, .flagPromo),
+        (.promo, 0.9, .flagPromo),
+        (.promo, 0.89, .none),
         (.legit, 0.2, .none),
     ])
     func action(category: SpamCategory, confidence: Double, expected: SpamAction) {
@@ -19,5 +21,6 @@ import Testing
     @Test func customThreshold() {
         let lenient = SpamPolicy(threshold: 0.6)
         #expect(lenient.action(for: Classification(category: .spam, confidence: 0.7)) == .moveToJunk)
+        #expect(lenient.action(for: Classification(category: .promo, confidence: 0.7)) == .flagPromo)
     }
 }
