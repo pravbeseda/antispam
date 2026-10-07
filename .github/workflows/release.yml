@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish the next patch version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A version tag pushed by hand onto this commit (a minor or major bump) is left as it is.
+          if [[ -n "$(git tag --points-at HEAD --list 'v[0-9]*')" ]]; then
+            echo "HEAD is already tagged."
+            exit 0
+          fi
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          if [[ -z $latest ]]; then
+            next=v0.1.0
+          else
+            IFS=. read -r major minor patch <<< "${latest#v}"
+            next="v$major.$minor.$((patch + 1))"
+          fi
+          gh release create "$next" --target "$GITHUB_SHA" --title "$next" --generate-notes

@@ -12,8 +12,9 @@ settings:
     SWIFT_VERSION: "6.0"
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    # scripts/install.sh overrides both with the release version from git.
+    MARKETING_VERSION: dev
+    CURRENT_PROJECT_VERSION: "0"
     APP_GROUP_ID: $(TeamIdentifierPrefix)com.kalugaman.antispam
     BUNDLE_ID_BASE: com.kalugaman.antispam
     APP_DISPLAY_NAME: Antispam

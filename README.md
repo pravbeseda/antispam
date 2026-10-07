@@ -42,9 +42,21 @@ The app shows the latest 200 decisions. They also go to the system log:
 log show --last 1h --predicate 'subsystem == "com.kalugaman.antispam"'
 ```
 
+## Versions
+
+Every merge to `main` gets the next patch version: the Release workflow tags it (`v0.1.0`, `v0.1.1`, …) and publishes a GitHub release with notes from the merged pull requests. For a minor or major bump, publish the release by hand before the next merge:
+
+```sh
+gh release create v0.2.0 --target main --generate-notes
+```
+
+`install.sh` builds the version from `git describe`, so pull before installing. A build off a tag shows its distance from it, e.g. `0.1.3-2-gabc1234`, or `-dirty` with uncommitted changes.
+
+The app shows its own version next to the version of the extension Mail last ran. Mail keeps the old extension loaded after a reinstall until it is reopened; the line turns orange until Mail checks a message with the new one.
+
 ## Watchdog
 
-`scripts/doctor.sh` checks that filtering works: Mail can reach the extension, the extension has not crashed, the latest Jev check succeeded, and the app is in `/Applications`.
+`scripts/doctor.sh` checks that filtering works: Mail can reach the extension, the extension has not crashed, the latest Jev check succeeded, the app is in `/Applications`, and Mail runs the installed version.
 
 ```sh
 scripts/doctor.sh --since 6h

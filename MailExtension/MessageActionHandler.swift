@@ -4,12 +4,14 @@ import os
 
 final class MessageActionHandler: NSObject, MEMessageActionHandler, Sendable {
     static let shared = MessageActionHandler()
+    private static let version = Bundle.main.shortVersion
 
     private let logger = Logger(subsystem: "com.kalugaman.antispam", category: "actions")
     private let decisionLog = SharedSettings().map { DecisionLog(fileURL: $0.decisionLogURL) }
 
     func decideAction(for message: MEMessage) async -> MEMessageActionDecision? {
         guard let data = message.rawData else { return .invokeAgainWithBody }
+        SharedSettings()?.extensionCheck = (Self.version, .now)
         let outcome = await outcome(for: data)
         await record(outcome, from: message.fromAddress.rawString, subject: message.subject)
         return Self.decision(for: outcome)
@@ -30,9 +32,9 @@ final class MessageActionHandler: NSObject, MEMessageActionHandler, Sendable {
     private func record(_ outcome: DecisionRecord.Outcome, from: String, subject: String) async {
         switch outcome {
         case let .classified(classification, action):
-            logger.notice("\(classification.category.rawValue, privacy: .public) \(classification.confidence, format: .fixed(precision: 2), privacy: .public) -> \(action.rawValue, privacy: .public) | \(from, privacy: .public) | \(subject, privacy: .public)")
+            logger.notice("\(classification.category.rawValue, privacy: .public) \(classification.confidence, format: .fixed(precision: 2), privacy: .public) -> \(action.rawValue, privacy: .public) | \(from, privacy: .public) | \(subject, privacy: .public) | v\(Self.version, privacy: .public)")
         case let .failed(reason):
-            logger.error("Left untouched: \(reason, privacy: .public) | \(from, privacy: .public) | \(subject, privacy: .public)")
+            logger.error("Left untouched: \(reason, privacy: .public) | \(from, privacy: .public) | \(subject, privacy: .public) | v\(Self.version, privacy: .public)")
         }
         do {
             try await decisionLog?.append(DecisionRecord(from: from, subject: subject, outcome: outcome))

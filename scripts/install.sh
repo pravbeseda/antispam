@@ -6,9 +6,14 @@ cd "${0:A:h}/.."
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 installed=/Applications/Antispam.app
 
+# The Release workflow tags every merge to main; a build off a tag shows how far it is from it, e.g. 0.1.3-2-gabc1234.
+version=$(git describe --tags --match 'v[0-9]*' --always --dirty)
+version=${version#v}
+
 xcodegen generate --quiet
 xcodebuild -project Antispam.xcodeproj -scheme Antispam -configuration Release \
-  -derivedDataPath .build/xcode -allowProvisioningUpdates -quiet build
+  -derivedDataPath .build/xcode -allowProvisioningUpdates -quiet build \
+  MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)"
 
 # Building registers the product; the Release copy here has the installed extension's ID,
 # and two registered copies make Mail fail with PlugInKit error 16.
@@ -52,4 +57,4 @@ launchctl bootstrap gui/$UID "$agent"
 open -g "$installed"
 sleep 3
 
-echo "Installed $installed. Quit and reopen Mail now to load the new extension."
+echo "Installed $installed v$version. Quit and reopen Mail now to load the new extension."
