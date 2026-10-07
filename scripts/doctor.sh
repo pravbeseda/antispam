@@ -51,7 +51,18 @@ if [[ $latest_action == *"Left untouched: "* ]]; then
 fi
 
 # 4. The app is installed.
-[[ -d /Applications/Antispam.app ]] || report "Antispam is not installed in /Applications. Run scripts/install.sh."
+installed=/Applications/Antispam.app
+[[ -d $installed ]] || report "Antispam is not installed in /Applications. Run scripts/install.sh."
+
+# 5. Mail runs the installed version: it keeps the old extension loaded after a reinstall until it is reopened.
+appex_info=$installed/Contents/PlugIns/AntispamMailExtension.appex/Contents/Info.plist
+if [[ -n $latest_action && -f $appex_info ]]; then
+  installed_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$appex_info")
+  # Versions before 0.1.0 did not log theirs.
+  running_version="an older version"
+  [[ $latest_action =~ '\| v([^ |]+)$' ]] && running_version=v$match[1]
+  [[ $running_version != v$installed_version ]] && report "Mail runs Antispam $running_version, but v$installed_version is installed. Quit and reopen Mail."
+fi
 
 (( ${#problems} == 0 )) && print "OK: no problems in the last $since."
 (( ${#problems} == 0 ))

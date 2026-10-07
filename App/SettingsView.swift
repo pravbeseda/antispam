@@ -26,6 +26,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
+            VersionStatusView(settings: settings)
             Text("Enable the extension in Mail → Settings → Extensions.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
