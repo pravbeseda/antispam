@@ -44,7 +44,7 @@ log show --last 1h --predicate 'subsystem == "com.kalugaman.antispam"'
 
 ## Versions
 
-Every merge to `main` gets the next patch version: the Release workflow tags it (`v0.1.0`, `v0.1.1`, …) and publishes a GitHub release with notes from the merged pull requests. For a minor or major bump, publish the release by hand before the next merge:
+Every merge to `main` gets the next patch version: the Release workflow tags it (`v0.1.0`, `v0.1.1`, …) and publishes a GitHub release with notes from the merged pull requests. Merges that land while a release is running can share the next one. For a minor or major bump, publish the release by hand before the next merge:
 
 ```sh
 gh release create v0.2.0 --target main --generate-notes
